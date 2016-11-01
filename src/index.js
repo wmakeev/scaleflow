@@ -9,9 +9,8 @@
 let applyMiddleware = require('./applyMiddleware')
 let applyPlugin = require('./applyPlugin')
 let createCore = require('./createCore')
-let ActionTypes = require('./actionTypes')
 let composeAsync = require('./composeAsync')
 
 module.exports = {
-  ActionTypes, applyMiddleware, applyPlugin, createCore, composeAsync
+  applyMiddleware, applyPlugin, createCore, composeAsync
 }

@@ -1,9 +1,6 @@
 'use strict'
 
-const isPromise = require('is-promise')
 const isPlainObject = require('lodash.isplainobject')
-
-let ActionTypes = require('./actionTypes')
 
 module.exports = function createCore (options, enhancer) {
   if (typeof options === 'function') {
@@ -15,20 +12,10 @@ module.exports = function createCore (options, enhancer) {
       throw new Error('Expected the enhancer to be a function.')
     }
 
-    let initCore = core => {
-      let action = core.dispatch({
-        type: ActionTypes.INIT,
-        payload: { options }
-      })
-      return isPromise(action)
-        ? action.then(() => core)
-        : core
-    }
-
-    let enhancedCore = enhancer(createCore)(options)
-    return isPromise(enhancedCore)
-      ? enhancedCore.then(initCore)
-      : initCore(enhancedCore)
+    return enhancer(createCore)(options)
+  }
+  if (!options) {
+    options = {}
   }
 
   let currentListeners = []
@@ -88,6 +75,7 @@ module.exports = function createCore (options, enhancer) {
   }
 
   return {
+    options,
     dispatch,
     subscribe
   }
