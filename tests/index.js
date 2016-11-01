@@ -5,7 +5,7 @@ const sinon = require('sinon')
 const co = require('co')
 
 let {
-      applyMiddleware, applyPlugin, createCore, composeAsync, ActionTypes
+  applyMiddleware, applyPlugin, createCore, composeAsync
 } = require('../src')
 
 test('scaleflow package api', t => {
@@ -13,7 +13,6 @@ test('scaleflow package api', t => {
   t.ok(applyPlugin, 'scaleflow#applyPlugin is ok')
   t.ok(createCore, 'scaleflow#createCore is ok')
   t.ok(composeAsync, 'scaleflow#composeAsync is ok')
-  t.ok(ActionTypes, 'scaleflow#ActionTypes is ok')
 
   t.end()
 })
@@ -21,11 +20,12 @@ test('scaleflow package api', t => {
 test('core simple instance', t => {
   let core = createCore()
 
-  t.plan(7)
+  t.plan(8)
 
   t.ok(core, 'core is ok')
   t.ok(core.dispatch, 'core.dispatch is ok')
   t.ok(core.subscribe, 'core.subscribe is ok')
+  t.ok(core.options, 'core.options is ok')
 
   let action1 = { type: 'foo1' }
   let action2 = { type: 'foo2' }
@@ -167,25 +167,109 @@ test('middleware', t => {
 
   t.equal(dispatchResult.type, 'second')
 
-  t.equal(spy1.callCount, 3, 'middleware1 call count')
-  t.equal(spy1.firstCall.args[0].type, ActionTypes.INIT, 'firstCall')
-  t.equal(spy1.secondCall.args[0].type, 'first', 'secondCall')
-  t.equal(spy1.thirdCall.args[0].type, 'second', 'thirdCall')
+  t.equal(spy1.callCount, 2, 'middleware1 call count')
+  t.equal(spy1.firstCall.args[0].type, 'first', 'firstCall')
+  t.equal(spy1.secondCall.args[0].type, 'second', 'secondCall')
 
-  t.equal(spy2.callCount, 3, 'middleware2 call count')
-  t.equal(spy2.firstCall.args[0].type, ActionTypes.INIT, 'firstCall')
+  t.equal(spy2.callCount, 2, 'middleware2 call count')
 
   t.ok(spy2.calledAfter(spy1), 'middleware2 called after middleware1')
 
-  t.equal(spy2.secondCall.args[0].type, 'first', 'secondCall')
-  t.equal(spy2.thirdCall.args[0].type, 'second', 'thirdCall')
+  t.equal(spy2.firstCall.args[0].type, 'first', 'secondCall')
+  t.equal(spy2.secondCall.args[0].type, 'second', 'thirdCall')
 
-  t.equal(spy3.callCount, 2, 'middleware3 call count')
-  t.equal(spy3.firstCall.args[0].type, ActionTypes.INIT, 'firstCall')
-  t.equal(spy3.secondCall.args[0].type, 'second', 'secondCall')
+  t.equal(spy3.callCount, 1, 'middleware3 call count')
+  t.equal(spy3.firstCall.args[0].type, 'second', 'firstCall')
 
   t.equal(subscribeSpy.callCount, 1, 'subscribe call count')
   t.equal(subscribeSpy.firstCall.args[0].type, 'second', 'firstCall')
 
   t.end()
 })
+
+test('createCore extending', t => {
+  let middlewareHead = num => core => next => action => {
+    if (action.type === 'foo') {
+      action.payload.push(num)
+    }
+    return next(action)
+  }
+
+  let middlewareTail = num => core => next => action => {
+    // next first
+    action = next(action)
+    if (action.type === 'foo') {
+      action.payload.push(num)
+    }
+    return action
+  }
+
+  // 1
+  let createCore1 = composeAsync(
+    applyMiddleware(middlewareHead(1), middlewareHead(2)),
+    applyMiddleware(middlewareHead(3)),
+    applyMiddleware(middlewareTail(4)) // next first
+  )(createCore)
+
+  // 2
+  let createCore2 = applyMiddleware(
+    middlewareHead(5),
+    middlewareHead(6)
+  )(createCore1)
+
+  // 3
+  let createCore3 = applyMiddleware(
+    middlewareTail(7), // next first
+    middlewareHead(8)
+  )(createCore2)
+
+  // 4
+  let createCore4 = applyMiddleware(middlewareHead(9))(createCore3)
+
+  // 5
+  let fooCore5 = applyMiddleware(middlewareHead(10))(createCore4)(
+    // 0
+    composeAsync(
+      // -1
+      applyMiddleware(
+        middlewareHead(11),
+        middlewareTail(12), // next first
+        middlewareHead(13)),
+      // -2
+      applyMiddleware(
+        middlewareHead(14),
+        middlewareHead(15),
+        middlewareTail(16)
+      )))
+
+  let fooAction = fooCore5.dispatch({
+    type: 'foo',
+    payload: []
+  })
+
+  t.deepEqual(fooAction, {
+    type: 'foo',
+    payload: [
+      // Head
+      10,                 // 5
+      9,                  // 4
+      8,                  // 3
+      5, 6,               // 2
+      1, 2, 3,            // 1
+
+      // Core (Head)
+      11, 13,             // -1
+      14, 15,             // -2
+      // Core (Tail)
+      16,                 // -2
+      12,                 // -1
+
+      // Tail
+      4,                  // 1
+      7                   // 3
+    ]
+  }, 'result action should be equivalent')
+
+  t.end()
+})
+
