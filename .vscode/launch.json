@@ -22,16 +22,24 @@
       "outFiles": []
     },
     {
-      "name": "Attach",
+      "name": "Sample",
       "type": "node2",
-      "request": "attach",
-      "port": 9229,
-      "address": "localhost",
-      "restart": false,
+      "request": "launch",
+      "program": "${workspaceRoot}/examples/sample-app.js",
+      "stopOnEntry": false,
+      "args": [],
+      "cwd": "${workspaceRoot}",
+      "preLaunchTask": null,
+      "runtimeExecutable": null,
+      "runtimeArgs": [
+        "--nolazy"
+      ],
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "internalConsole",
       "sourceMaps": false,
-      "outFiles": [],
-      "localRoot": "${workspaceRoot}",
-      "remoteRoot": null
+      "outFiles": []
     }
   ]
 }

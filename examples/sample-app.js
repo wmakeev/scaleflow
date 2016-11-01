@@ -1,27 +1,27 @@
-let {
-  applyMiddleware, applyPlugin, createCore, compose, ActionTypes
+const {
+  applyMiddleware, applyPlugin, createCore, composeAsync: compose
 } = require('../src')
 
-let myActionTypes = {
+const myActionTypes = {
   LOG: 'LOG'
 }
 
-let loggerPlugin = core => {
-  let log = (...args) => core.dispatch({
-    type: myActionTypes.LOG,
-    payload: args
-  })
+const logAction = (...args) => ({
+  type: myActionTypes.LOG,
+  payload: args
+})
 
-  return Object.assign({}, core, { log })
+const loggerPlugin = core => {
+  return Object.assign({}, core, {
+    log: (...args) => core.dispatch(logAction(...args))
+  })
 }
 
-let loggerMiddleware = core => {
-  let prefix = 'LOG:'
+const loggerMiddleware = core => {
+  let prefix = core.options.name || 'LOG'
   return next => action => {
-    if (action.type === ActionTypes.INIT) {
-      prefix = action.payload.options.prefix
-    } else if (action.type === myActionTypes.LOG) {
-      console.log.apply(console, action.payload)
+    if (action.type === myActionTypes.LOG) {
+      console.log(`${prefix}:`, ...action.payload)
     }
     return next(action)
   }
@@ -33,4 +33,4 @@ let myCore = createCore(
     applyPlugin(loggerPlugin),
     applyMiddleware(loggerMiddleware)))
 
-myCore.log('Hello world!')
+myCore.log('Hello world!') // MyCore: Hello world!
