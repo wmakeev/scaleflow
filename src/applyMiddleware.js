@@ -9,10 +9,11 @@ module.exports = function applyMiddleware (...middlewares) {
       let dispatch = core.dispatch
       let chain = []
 
-      let middlewareAPI = {
+      let coreAPI = Object.assign({}, core, {
         dispatch: (action) => dispatch(action)
-      }
-      chain = middlewares.map(middleware => middleware(middlewareAPI))
+      })
+
+      chain = middlewares.map(middleware => middleware(coreAPI))
       dispatch = compose(...chain)(core.dispatch)
 
       return Object.assign({}, core, { dispatch })
@@ -20,10 +21,8 @@ module.exports = function applyMiddleware (...middlewares) {
 
     let curCore = createCore(...args)
 
-    if (isPromise(curCore)) {
-      return curCore.then(applyMiddlewares)
-    } else {
-      return applyMiddlewares(curCore)
-    }
+    return isPromise(curCore)
+      ? curCore.then(applyMiddlewares)
+      : applyMiddlewares(curCore)
   }
 }
