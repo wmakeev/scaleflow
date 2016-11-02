@@ -17,7 +17,7 @@ test('scaleflow package api', t => {
   t.end()
 })
 
-test('core simple instance', t => {
+test('Core simple instance', t => {
   let core = createCore()
 
   t.plan(8)
@@ -45,29 +45,44 @@ test('core simple instance', t => {
   core.dispatch(action2)
 })
 
-test('plugins', co.wrap(function * (t) {
-  let syncPlugin = core => {
+test('Plugins', co.wrap(function * (t) {
+  let syncPlugin1 = core => {
     return Object.assign({}, core, { foo: 'bar' })
   }
 
-  let syncCore = createCore(applyPlugin(syncPlugin))
-  t.ok(syncCore, 'createCore returns core sync')
-  t.equal(syncCore.foo, 'bar', 'plugin applied to core')
+  t.comment('apply one sync plugin')
 
-  let asyncPlugin = core => {
+  let syncCore1 = createCore(applyPlugin(syncPlugin1))
+  t.ok(syncCore1, 'createCore returns core sync')
+  t.equal(syncCore1.foo, 'bar', 'plugin1 applied to core1')
+
+  t.comment('apply tow sync plugins')
+
+  let syncPlugin2 = core => {
+    return Object.assign({}, core, { foo2: 'bar2' })
+  }
+
+  let syncCore2 = createCore(applyPlugin(syncPlugin1, syncPlugin2))
+  t.ok(syncCore2, 'createCore returns core sync')
+  t.equal(syncCore2.foo, 'bar', 'plugin1 applied to core2')
+  t.equal(syncCore2.foo2, 'bar2', 'plugin2 applied to core2')
+
+  t.comment('apply async and sync plugins')
+
+  let asyncPlugin3 = core => {
     return Promise.resolve(Object.assign({}, core, {
       async: 'ok',
       foo: core.foo + 'baz'
     }))
   }
 
-  let asyncCore = yield createCore(applyPlugin(syncPlugin, asyncPlugin))
-  t.ok(asyncCore, 'createCore returns core async')
-  t.equal(asyncCore.async, 'ok', 'plugins applied async to core #1')
-  t.equal(asyncCore.foo, 'barbaz', 'plugins applied async to core #2')
+  let asyncCore3 = yield createCore(applyPlugin(syncPlugin1, asyncPlugin3))
+  t.ok(asyncCore3, 'createCore returns core async')
+  t.equal(asyncCore3.async, 'ok', 'async plugin3 applied async to core3 #1')
+  t.equal(asyncCore3.foo, 'barbaz', 'plugins applied async to core3 #2')
 }))
 
-test('plugins (parallel and serial modes)', co.wrap(function * (t) {
+test('Plugins (parallel and serial modes)', co.wrap(function * (t) {
   let sequence = []
 
   let plugin0 = core => {
@@ -103,7 +118,7 @@ test('plugins (parallel and serial modes)', co.wrap(function * (t) {
   t.deepEqual(sequence, ['p0', 'p1', 'p3', 'p2'], 'plugins applied to core in correct order')
 }))
 
-test('not able plugins mutate core in parallel mode', t => {
+test('Not able plugins mutate core in parallel mode', t => {
   let plugin1 = core => {
     return core
   }
@@ -130,7 +145,7 @@ test('not able plugins mutate core in parallel mode', t => {
     })
 })
 
-test('middleware', t => {
+test('Middleware', t => {
   let spy1 = sinon.spy()
   let middleware1 = core => next => action => {
     spy1(action)
@@ -187,7 +202,28 @@ test('middleware', t => {
   t.end()
 })
 
-test('createCore extending', t => {
+test('Complex core', t => {
+  const expectedPayload = [
+    // Head
+    10,                 // 5
+    9,                  // 4
+    8,                  // 3
+    5, 6,               // 2
+    1, 2, 3,            // 1
+
+    // Core (Head)
+    11, 13,             // -1
+    14, 15,             // -2
+
+    // Core (Tail)
+    16,                 // -2
+    12,                 // -1
+
+    // Tail
+    4,                  // 1
+    7                   // 3
+  ]
+
   let middlewareHead = num => core => next => action => {
     if (action.type === 'foo') {
       action.payload.push(num)
@@ -204,17 +240,34 @@ test('createCore extending', t => {
     return action
   }
 
+  let plugin = num => core => {
+    return Object.assign({}, core, { [`plugin${num}`] () {
+      let action = core.dispatch({
+        type: 'foo',
+        payload: []
+      })
+      t.deepEqual(action, {
+        type: 'foo',
+        payload: expectedPayload
+      }, `result action in plugin#${num} should be equivalent`)
+    } })
+  }
+
   // 1
   let createCore1 = composeAsync(
+    applyPlugin(plugin(1)),
     applyMiddleware(middlewareHead(1), middlewareHead(2)),
     applyMiddleware(middlewareHead(3)),
     applyMiddleware(middlewareTail(4)) // next first
   )(createCore)
 
   // 2
-  let createCore2 = applyMiddleware(
-    middlewareHead(5),
-    middlewareHead(6)
+  let createCore2 = composeAsync(
+    applyMiddleware(
+      middlewareHead(5),
+      middlewareHead(6)),
+    applyPlugin(
+      plugin(2))
   )(createCore1)
 
   // 3
@@ -227,20 +280,25 @@ test('createCore extending', t => {
   let createCore4 = applyMiddleware(middlewareHead(9))(createCore3)
 
   // 5
-  let fooCore5 = applyMiddleware(middlewareHead(10))(createCore4)(
-    // 0
-    composeAsync(
-      // -1
-      applyMiddleware(
-        middlewareHead(11),
-        middlewareTail(12), // next first
-        middlewareHead(13)),
-      // -2
-      applyMiddleware(
-        middlewareHead(14),
-        middlewareHead(15),
-        middlewareTail(16)
-      )))
+  let createCore5 = applyMiddleware(middlewareHead(10))(createCore4)
+
+  // 0
+  let enhancer = composeAsync(
+    applyPlugin(plugin(3)),
+    // -1
+    applyMiddleware(
+      middlewareHead(11),
+      middlewareTail(12), // next first
+      middlewareHead(13)),
+    // -2
+    applyMiddleware(
+      middlewareHead(14),
+      middlewareHead(15),
+      middlewareTail(16)),
+
+    applyPlugin(plugin(4)))
+
+  let fooCore5 = createCore5(enhancer)
 
   let fooAction = fooCore5.dispatch({
     type: 'foo',
@@ -249,26 +307,15 @@ test('createCore extending', t => {
 
   t.deepEqual(fooAction, {
     type: 'foo',
-    payload: [
-      // Head
-      10,                 // 5
-      9,                  // 4
-      8,                  // 3
-      5, 6,               // 2
-      1, 2, 3,            // 1
-
-      // Core (Head)
-      11, 13,             // -1
-      14, 15,             // -2
-      // Core (Tail)
-      16,                 // -2
-      12,                 // -1
-
-      // Tail
-      4,                  // 1
-      7                   // 3
-    ]
+    payload: expectedPayload
   }, 'result action should be equivalent')
+
+  t.ok(fooCore5.plugin1, 'fooCore5.plugin1 to be ok')
+  // fooCore5.plugin1()
+
+  t.ok(fooCore5.plugin2, 'fooCore5.plugin2 to be ok')
+  t.ok(fooCore5.plugin3, 'fooCore5.plugin3 to be ok')
+  t.ok(fooCore5.plugin4, 'fooCore5.plugin4 to be ok')
 
   t.end()
 })
