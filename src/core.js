@@ -4,9 +4,8 @@ const stampit = require('stampit')
 const isPlainObject = require('lodash.isplainobject')
 
 const stampCompose = require('./stampCompose')
-const extractFunctions = require('./extractFunctions')
 
-const coreInit = function (options, { instance }) {
+function coreInit (options, { instance }) {
   let currentListeners = []
   let nextListeners = currentListeners
 
@@ -67,8 +66,8 @@ const coreInit = function (options, { instance }) {
 }
 
 function middleware (...args) {
-  return this.compose({
-    middlewares: extractFunctions(...args)
+  return this.deepConfiguration({
+    middlewares: args
   })
 }
 
@@ -77,5 +76,7 @@ module.exports = stampit({
     compose: stampCompose, // infecting
     middleware
   },
-  initializers: [coreInit]
+  initializers: [
+    coreInit
+  ]
 })

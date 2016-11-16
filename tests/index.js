@@ -5,13 +5,13 @@ const sinon = require('sinon')
 const co = require('co')
 const isPromise = require('is-promise')
 
-const skip = () => {}
+// const skip = () => {}
 
-let { Core, composeAsync } = require('../src')
+let { Core, applyMiddleware } = require('../src')
 
 test('Scaleflow package api', t => {
   t.equal(typeof Core, 'function', 'scaleflow#Core is function')
-  t.equal(typeof composeAsync, 'function', 'scaleflow#composeAsync is function')
+  t.equal(typeof applyMiddleware, 'function', 'scaleflow#applyMiddleware is function')
   t.end()
 })
 
@@ -171,7 +171,7 @@ test('Middleware', t => {
 })
 
 test('Complex core', t => {
-  const expectedPayload = [ 1, 2, 3, 5, 6, 8, 7, 4 ]
+  const expectedPayload = [ 1, 2, 3, 9, 5, 7, 6, 8, 4 ]
 
   let middlewareHead = num => core => next => action => {
     if (action.type === 'foo') {
@@ -213,14 +213,18 @@ test('Complex core', t => {
 
   // 2
   let Core2 = Core1
-    .middleware(middlewareHead(5), middlewareHead(6))
+    .init(
+      applyMiddleware(
+        middlewareHead(5),
+        middlewareTail(6), // next first
+        middlewareHead(7)))
     .init(initializer(2))
 
   // 3
   let Core3 = Core2
     .middleware(
-      middlewareTail(7), // next first
-      middlewareHead(8))
+      middlewareTail(8), // next first
+      middlewareHead(9))
 
   let core3 = Core3()
 

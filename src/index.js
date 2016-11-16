@@ -7,9 +7,8 @@
  */
 
 let Core = require('./core')
-let composeAsync = require('./composeAsync')
 let applyMiddleware = require('./applyMiddleware')
 
 module.exports = {
-  Core, applyMiddleware, composeAsync
+  Core, applyMiddleware
 }

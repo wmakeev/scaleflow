@@ -1,7 +1,7 @@
 'use strict'
 
 const isPromise = require('is-promise')
-const compose = require('./composeAsync')
+const compose = require('lodash.flowright')
 
 module.exports = function applyMiddleware (...middlewares) {
   return (options, { instance }) => {
