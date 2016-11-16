@@ -6,11 +6,10 @@
  * Licensed under MIT.
  */
 
-let applyMiddleware = require('./applyMiddleware')
-let applyPlugin = require('./applyPlugin')
-let createCore = require('./createCore')
+let Core = require('./core')
 let composeAsync = require('./composeAsync')
+let applyMiddleware = require('./applyMiddleware')
 
 module.exports = {
-  applyMiddleware, applyPlugin, createCore, composeAsync
+  Core, applyMiddleware, composeAsync
 }

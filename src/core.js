@@ -1,23 +1,12 @@
 'use strict'
 
+const stampit = require('stampit')
 const isPlainObject = require('lodash.isplainobject')
 
-module.exports = function createCore (options, enhancer) {
-  if (typeof options === 'function') {
-    enhancer = options
-    options = {}
-  }
-  if (typeof enhancer !== 'undefined') {
-    if (typeof enhancer !== 'function') {
-      throw new Error('Expected the enhancer to be a function.')
-    }
+const stampCompose = require('./stampCompose')
+const extractFunctions = require('./extractFunctions')
 
-    return enhancer(createCore)(options)
-  }
-  if (!options) {
-    options = {}
-  }
-
+const coreInit = function (options, { instance }) {
   let currentListeners = []
   let nextListeners = currentListeners
 
@@ -74,9 +63,19 @@ module.exports = function createCore (options, enhancer) {
     return action
   }
 
-  return {
-    options,
-    dispatch,
-    subscribe
-  }
+  return Object.assign(instance, { options: options || {}, dispatch, subscribe })
 }
+
+function middleware (...args) {
+  return this.compose({
+    middlewares: extractFunctions(...args)
+  })
+}
+
+module.exports = stampit({
+  staticProperties: {
+    compose: stampCompose, // infecting
+    middleware
+  },
+  initializers: [coreInit]
+})

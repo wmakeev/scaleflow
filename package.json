@@ -1,7 +1,7 @@
 {
   "name": "scaleflow",
-  "version": "0.1.1",
-  "description": "Framework for scaleable apps",
+  "version": "0.2.0",
+  "description": "Tools and convention to create scaleable apps",
   "homepage": "https://github.com/wmakeev/scaleflow",
   "repository": "wmakeev/scaleflow",
   "author": {
@@ -19,7 +19,11 @@
   ],
   "dependencies": {
     "is-promise": "^2.1.0",
-    "lodash.isplainobject": "^4.0.6"
+    "lodash.isfunction": "^3.0.8",
+    "lodash.isobject": "^3.0.2",
+    "lodash.isplainobject": "^4.0.6",
+    "make-compose": "^1.0.0",
+    "stampit": "^3.0.6"
   },
   "devDependencies": {
     "blue-tape": "^0.1.0",

@@ -1,6 +1,4 @@
-const {
-  applyMiddleware, applyPlugin, createCore, composeAsync: compose
-} = require('../src')
+const { Core } = require('../src')
 
 const myActionTypes = {
   LOG: 'LOG'
@@ -11,8 +9,8 @@ const logAction = (...args) => ({
   payload: args
 })
 
-const loggerPlugin = core => {
-  return Object.assign({}, core, {
+const loggerInitializer = (options, { instance: core }) => {
+  return Object.assign(core, {
     log: (...args) => core.dispatch(logAction(...args))
   })
 }
@@ -27,10 +25,10 @@ const loggerMiddleware = core => {
   }
 }
 
-let myCore = createCore(
-  { name: 'MyCore' },
-  compose(
-    applyPlugin(loggerPlugin),
-    applyMiddleware(loggerMiddleware)))
+let MyCore = Core
+  .init(loggerInitializer)
+  .middleware(loggerMiddleware)
+
+let myCore = MyCore({ name: 'MyCore' })
 
 myCore.log('Hello world!') // MyCore: Hello world!

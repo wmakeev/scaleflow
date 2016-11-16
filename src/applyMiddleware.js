@@ -4,25 +4,19 @@ const isPromise = require('is-promise')
 const compose = require('./composeAsync')
 
 module.exports = function applyMiddleware (...middlewares) {
-  return (createCore) => (...args) => {
+  return (options, { instance }) => {
     let applyMiddlewares = core => {
-      let dispatch = core.dispatch
+      let dispatch
       let chain = []
 
-      let coreAPI = Object.assign({}, core, {
-        dispatch: (action) => dispatch(action)
-      })
-
-      chain = middlewares.map(middleware => middleware(coreAPI))
+      chain = middlewares.map(middleware => middleware(core))
       dispatch = compose(...chain)(core.dispatch)
 
-      return Object.assign({}, core, { dispatch })
+      return Object.assign(core, { dispatch })
     }
 
-    let curCore = createCore(...args)
-
-    return isPromise(curCore)
-      ? curCore.then(applyMiddlewares)
-      : applyMiddlewares(curCore)
+    return isPromise(instance)
+      ? instance.then(applyMiddlewares)
+      : applyMiddlewares(instance)
   }
 }

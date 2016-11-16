@@ -3,29 +3,35 @@
 const test = require('blue-tape')
 const sinon = require('sinon')
 const co = require('co')
+const isPromise = require('is-promise')
 
-let {
-  applyMiddleware, applyPlugin, createCore, composeAsync
-} = require('../src')
+const skip = () => {}
 
-test('scaleflow package api', t => {
-  t.ok(applyMiddleware, 'scaleflow#applyMiddleware is ok')
-  t.ok(applyPlugin, 'scaleflow#applyPlugin is ok')
-  t.ok(createCore, 'scaleflow#createCore is ok')
-  t.ok(composeAsync, 'scaleflow#composeAsync is ok')
+let { Core, composeAsync } = require('../src')
 
+test('Scaleflow package api', t => {
+  t.equal(typeof Core, 'function', 'scaleflow#Core is function')
+  t.equal(typeof composeAsync, 'function', 'scaleflow#composeAsync is function')
+  t.end()
+})
+
+test('Core api', t => {
+  t.equal(typeof Core.compose, 'function', 'Core#compose is function')
+  t.equal(typeof Core.init, 'function', 'Core#init is function')
+  t.equal(typeof Core.middleware, 'function', 'Core#middleware is function')
   t.end()
 })
 
 test('Core simple instance', t => {
-  let core = createCore()
+  let core = Core({ foo: 'bar' })
 
-  t.plan(8)
+  t.plan(9)
 
   t.ok(core, 'core is ok')
-  t.ok(core.dispatch, 'core.dispatch is ok')
-  t.ok(core.subscribe, 'core.subscribe is ok')
-  t.ok(core.options, 'core.options is ok')
+  t.equal(typeof core.dispatch, 'function', 'core.dispatch is function')
+  t.equal(typeof core.subscribe, 'function', 'core.subscribe is function')
+  t.equal(typeof core.options, 'object', 'core.options is ok')
+  t.equal(core.options.foo, 'bar', 'core.options is ok')
 
   let action1 = { type: 'foo1' }
   let action2 = { type: 'foo2' }
@@ -46,103 +52,65 @@ test('Core simple instance', t => {
 })
 
 test('Plugins', co.wrap(function * (t) {
-  let syncPlugin1 = core => {
-    return Object.assign({}, core, { foo: 'bar' })
+  t.comment('apply sync plugins')
+
+  let syncPlugin1 = (options, { instance }) => {
+    return Object.assign(instance, { foo1: 'bar1' })
   }
 
-  t.comment('apply one sync plugin')
+  let SyncCore1 = Core.init(syncPlugin1)
 
-  let syncCore1 = createCore(applyPlugin(syncPlugin1))
-  t.ok(syncCore1, 'createCore returns core sync')
-  t.equal(syncCore1.foo, 'bar', 'plugin1 applied to core1')
-
-  t.comment('apply tow sync plugins')
-
-  let syncPlugin2 = core => {
-    return Object.assign({}, core, { foo2: 'bar2' })
+  let syncPlugin2 = function (options, { instance }) {
+    return Object.assign(this, { foo2: 'bar2' })
   }
 
-  let syncCore2 = createCore(applyPlugin(syncPlugin1, syncPlugin2))
-  t.ok(syncCore2, 'createCore returns core sync')
-  t.equal(syncCore2.foo, 'bar', 'plugin1 applied to core2')
-  t.equal(syncCore2.foo2, 'bar2', 'plugin2 applied to core2')
+  let SyncCore2 = SyncCore1.init(syncPlugin2)
+  let syncCore2 = SyncCore2()
+
+  t.ok(syncCore2, 'create core sync')
+  t.equal(syncCore2.foo1, 'bar1', 'plugin1 applied to core')
+  t.equal(syncCore2.foo2, 'bar2', 'plugin2 applied to core')
 
   t.comment('apply async and sync plugins')
 
-  let asyncPlugin3 = core => {
-    return Promise.resolve(Object.assign({}, core, {
-      async: 'ok',
-      foo: core.foo + 'baz'
+  let asyncPlugin3 = (options, { instance }) => {
+    return Promise.resolve(Object.assign(instance, {
+      foo3: instance.foo1 + ' ' + instance.foo2
     }))
   }
 
-  let asyncCore3 = yield createCore(applyPlugin(syncPlugin1, asyncPlugin3))
-  t.ok(asyncCore3, 'createCore returns core async')
-  t.equal(asyncCore3.async, 'ok', 'async plugin3 applied async to core3 #1')
-  t.equal(asyncCore3.foo, 'barbaz', 'plugins applied async to core3 #2')
+  let AsyncCore1 = Core.init(syncPlugin1, asyncPlugin3, syncPlugin2)
+  let asyncCoreResult1 = AsyncCore1()
+
+  t.ok(isPromise(asyncCoreResult1), 'create async core')
+  let asyncCore1 = yield asyncCoreResult1
+
+  t.ok(asyncCore1, 'Core create core async')
+  t.equal(asyncCore1.foo1, 'bar1', 'plugin1 applied to core')
+  t.equal(asyncCore1.foo2, 'bar2', 'plugin2 applied to core')
+  t.equal(asyncCore1.foo3, 'bar1 undefined', 'async plugins applied to core in serial')
 }))
 
-test('Plugins (parallel and serial modes)', co.wrap(function * (t) {
-  let sequence = []
+test('Force plugins mutate core', t => {
+  let plugin1 = (_, { instance }) => (Object.assign(instance, { foo1: true }))
 
-  let plugin0 = core => {
+  let plugin2 = () => { return { foo2: true } }
+
+  let plugin3 = () => {
     return new Promise(resolve => setTimeout(() => {
-      sequence.push('p0')
-      resolve(core)
-    }), 20)
-  }
-
-  let plugin1 = core => {
-    sequence.push('p1')
-    return core
-  }
-
-  let plugin2 = core => {
-    return new Promise(resolve => setTimeout(() => {
-      sequence.push('p2')
-      resolve(core)
+      resolve({ foo3: true })
     }), 10)
   }
 
-  let plugin3 = core => {
-    sequence.push('p3')
-    return core
-  }
+  let Core1 = Core.init(plugin1, plugin2, plugin3)
 
-  let core1 = yield createCore(applyPlugin(
-    plugin0,
-    [plugin1, plugin2, plugin3]
-  ))
-
-  t.ok(core1, 'result core is ok')
-  t.deepEqual(sequence, ['p0', 'p1', 'p3', 'p2'], 'plugins applied to core in correct order')
-}))
-
-test('Not able plugins mutate core in parallel mode', t => {
-  let plugin1 = core => {
-    return core
-  }
-
-  let plugin2 = core => {
-    return new Promise(resolve => setTimeout(() => {
-      resolve(core)
-    }), 10)
-  }
-
-  let mutationPlugin = core => {
-    return Object.assign({}, core, { mutated: true })
-  }
-
-  createCore(applyPlugin(
-    [plugin1, plugin2, mutationPlugin]
-  ))
-    .then(() => {
-      t.fail('Error expected')
-    })
-    .catch(err => {
-      t.equal(err.message, 'Plugin in parallel mode must not mutate core')
-      t.end()
-    })
+  Core1().then((core1) => {
+    t.ok(core1)
+    t.ok(core1.foo1)
+    t.notOk(core1.foo2)
+    t.notOk(core1.foo2)
+    t.end()
+  })
 })
 
 test('Middleware', t => {
@@ -170,13 +138,13 @@ test('Middleware', t => {
     return next(action)
   }
 
-  let curCore = createCore(
-    applyMiddleware(middleware1, middleware2, middleware3))
+  let TestCore = Core.middleware(middleware1, middleware2, middleware3)
+  let testCore = TestCore()
 
   let subscribeSpy = sinon.spy()
-  curCore.subscribe(subscribeSpy)
+  testCore.subscribe(subscribeSpy)
 
-  let dispatchResult = curCore.dispatch({
+  let dispatchResult = testCore.dispatch({
     type: 'first'
   })
 
@@ -203,26 +171,7 @@ test('Middleware', t => {
 })
 
 test('Complex core', t => {
-  const expectedPayload = [
-    // Head
-    10,                 // 5
-    9,                  // 4
-    8,                  // 3
-    5, 6,               // 2
-    1, 2, 3,            // 1
-
-    // Core (Head)
-    11, 13,             // -1
-    14, 15,             // -2
-
-    // Core (Tail)
-    16,                 // -2
-    12,                 // -1
-
-    // Tail
-    4,                  // 1
-    7                   // 3
-  ]
+  const expectedPayload = [ 1, 2, 3, 5, 6, 8, 7, 4 ]
 
   let middlewareHead = num => core => next => action => {
     if (action.type === 'foo') {
@@ -240,67 +189,42 @@ test('Complex core', t => {
     return action
   }
 
-  let plugin = num => core => {
-    return Object.assign({}, core, { [`plugin${num}`] () {
-      let action = core.dispatch({
-        type: 'foo',
-        payload: []
-      })
-      t.deepEqual(action, {
-        type: 'foo',
-        payload: expectedPayload
-      }, `result action in plugin#${num} should be equivalent`)
-    } })
+  let initializer = num => (_, { instance: core }) => {
+    return Object.assign(core, {
+      [`init${num}`] () {
+        let action = core.dispatch({
+          type: 'foo',
+          payload: []
+        })
+        t.deepEqual(action, {
+          type: 'foo',
+          payload: expectedPayload
+        }, `result action in plugin#${num} should be equivalent`)
+      }
+    })
   }
 
   // 1
-  let createCore1 = composeAsync(
-    applyPlugin(plugin(1)),
-    applyMiddleware(middlewareHead(1), middlewareHead(2)),
-    applyMiddleware(middlewareHead(3)),
-    applyMiddleware(middlewareTail(4)) // next first
-  )(createCore)
+  let Core1 = Core
+    .init(initializer(1))
+    .middleware(middlewareHead(1), middlewareHead(2))
+    .middleware(middlewareHead(3))
+    .middleware(middlewareTail(4)) // next first)
 
   // 2
-  let createCore2 = composeAsync(
-    applyMiddleware(
-      middlewareHead(5),
-      middlewareHead(6)),
-    applyPlugin(
-      plugin(2))
-  )(createCore1)
+  let Core2 = Core1
+    .middleware(middlewareHead(5), middlewareHead(6))
+    .init(initializer(2))
 
   // 3
-  let createCore3 = applyMiddleware(
-    middlewareTail(7), // next first
-    middlewareHead(8)
-  )(createCore2)
+  let Core3 = Core2
+    .middleware(
+      middlewareTail(7), // next first
+      middlewareHead(8))
 
-  // 4
-  let createCore4 = applyMiddleware(middlewareHead(9))(createCore3)
+  let core3 = Core3()
 
-  // 5
-  let createCore5 = applyMiddleware(middlewareHead(10))(createCore4)
-
-  // 0
-  let enhancer = composeAsync(
-    applyPlugin(plugin(3)),
-    // -1
-    applyMiddleware(
-      middlewareHead(11),
-      middlewareTail(12), // next first
-      middlewareHead(13)),
-    // -2
-    applyMiddleware(
-      middlewareHead(14),
-      middlewareHead(15),
-      middlewareTail(16)),
-
-    applyPlugin(plugin(4)))
-
-  let fooCore5 = createCore5(enhancer)
-
-  let fooAction = fooCore5.dispatch({
+  let fooAction = core3.dispatch({
     type: 'foo',
     payload: []
   })
@@ -310,12 +234,11 @@ test('Complex core', t => {
     payload: expectedPayload
   }, 'result action should be equivalent')
 
-  t.ok(fooCore5.plugin1, 'fooCore5.plugin1 to be ok')
-  // fooCore5.plugin1()
+  t.ok(core3.init1, 'core.init1 to be ok')
+  core3.init1()
 
-  t.ok(fooCore5.plugin2, 'fooCore5.plugin2 to be ok')
-  t.ok(fooCore5.plugin3, 'fooCore5.plugin3 to be ok')
-  t.ok(fooCore5.plugin4, 'fooCore5.plugin4 to be ok')
+  t.ok(core3.init2, 'core.init2 to be ok')
+  core3.init2()
 
   t.end()
 })
