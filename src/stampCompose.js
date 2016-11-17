@@ -12,7 +12,7 @@ module.exports = MakeCompose({
       let core = that.createObject(descriptor.methods || {})
       let initializers = (descriptor.initializers || [])
       let middlewares = (descriptor.deepConfiguration || {}).middlewares
-      let initializersResult = core
+      let initializersResult
 
       that.merge(core, descriptor.deepProperties)
       that.assign(core, descriptor.properties)
@@ -35,7 +35,7 @@ module.exports = MakeCompose({
         }, null)
       }
 
-      // Wait for async core mutations if Promise
+      // Wait for async core mutations
       return isPromise(initializersResult)
         ? initializersResult.then(() => core)
         : core
