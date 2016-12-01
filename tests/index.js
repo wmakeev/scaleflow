@@ -2,7 +2,7 @@
 
 const test = require('blue-tape')
 const sinon = require('sinon')
-const co = require('co')
+const mc = require('minico')
 const isPromise = require('is-promise')
 
 // const skip = () => {}
@@ -25,10 +25,11 @@ test('Core api', t => {
 test('Core simple instance', t => {
   let core = Core({ foo: 'bar' })
 
-  t.plan(9)
+  t.plan(10)
 
   t.ok(core, 'core is ok')
   t.equal(typeof core.dispatch, 'function', 'core.dispatch is function')
+  t.equal(typeof core.dispatchAsync, 'function', 'core.dispatchAsync is function')
   t.equal(typeof core.subscribe, 'function', 'core.subscribe is function')
   t.equal(typeof core.options, 'object', 'core.options is ok')
   t.equal(core.options.foo, 'bar', 'core.options is ok')
@@ -51,7 +52,45 @@ test('Core simple instance', t => {
   core.dispatch(action2)
 })
 
-test('Plugins', co.wrap(function * (t) {
+test('Core dispatchAsync', mc(function * (t) {
+  t.plan(4)
+
+  let resultPromise
+  let result
+
+  let myCore = Core.middleware(core => next => action => {
+    if (action.type === 'BAR') {
+      throw new Error('Oh no... Bar!')
+    } else if (action.type === 'BAZ') {
+      return Promise.resolve('BAZ')
+    } else {
+      return next(action)
+    }
+  }).create()
+
+  let fooAction = { type: 'FOO' }
+
+  resultPromise = myCore.dispatchAsync(fooAction)
+
+  t.ok(isPromise(resultPromise), 'dispatch result is Promise')
+
+  result = yield resultPromise
+  t.equal(result, fooAction, 'actions is pass through')
+
+  let barAction = { type: 'BAR' }
+
+  try {
+    yield myCore.dispatchAsync(barAction)
+  } catch (e) {
+    t.equal(e.message, 'Oh no... Bar!', 'catch errors')
+  }
+
+  let bazAction = { type: 'BAZ' }
+
+  t.equal(yield myCore.dispatchAsync(bazAction), 'BAZ', 'promise result is pass through')
+}))
+
+test('Plugins', mc(function * (t) {
   t.comment('apply sync plugins')
 
   let syncPlugin1 = (options, { instance }) => {
