@@ -17,7 +17,10 @@
   },
   "keywords": [
     "app",
-    "scale"
+    "stamp",
+    "stampit",
+    "middleware",
+    "composeable"
   ],
   "dependencies": {
     "is-promise": "^2.1.0",
