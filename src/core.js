@@ -1,6 +1,7 @@
 'use strict'
 
 const stampit = require('stampit')
+const isPromise = require('is-promise')
 const isPlainObject = require('lodash.isplainobject')
 
 const stampCompose = require('./stampCompose')
@@ -65,6 +66,18 @@ function coreInit (options, { instance }) {
   return Object.assign(instance, { options: options || {}, dispatch, subscribe })
 }
 
+function dispatchAsyncInitializer (options, { instance }) {
+  instance.dispatchAsync = function dispatchAsync (action) {
+    let result
+    try {
+      result = instance.dispatch(action)
+    } catch (e) {
+      return Promise.reject(e)
+    }
+    return isPromise(result) ? result : Promise.resolve(result)
+  }
+}
+
 function middleware (...args) {
   return this.deepConfiguration({
     middlewares: args
@@ -77,6 +90,7 @@ module.exports = stampit({
     middleware
   },
   initializers: [
-    coreInit
+    coreInit,
+    dispatchAsyncInitializer
   ]
 })
