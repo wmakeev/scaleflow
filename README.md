@@ -1,61 +1,52 @@
 # ScaleFlow
 
-![banner]()
+[![npm](https://img.shields.io/npm/v/scaleflow.svg?maxAge=2592000&style=flat-square)](https://www.npmjs.com/package/scaleflow)
+[![Travis](https://img.shields.io/travis/wmakeev/scaleflow.svg?maxAge=2592000&style=flat-square)](https://travis-ci.org/wmakeev/scaleflow)
+[![Coveralls](https://img.shields.io/coveralls/wmakeev/scaleflow.svg?maxAge=2592000&style=flat-square)](https://coveralls.io/github/wmakeev/scaleflow)
+[![Gemnasium](https://img.shields.io/gemnasium/wmakeev/scaleflow.svg?maxAge=2592000&style=flat-square)](https://gemnasium.com/github.com/wmakeev/scaleflow)
+[![JavaScript Style Guide](https://img.shields.io/badge/code%20style-standard-brightgreen.svg?style=flat-square)](http://standardjs.com/)
 
-![badge]()
-![badge]()
-
-> This is an example file with maximal choices selected.
-
-This is a long description.
-
-## Table of Contents
-
-- [Security](#security)
-- [Background](#background)
-- [Installation](#installation)
-- [Usage](#usage)
-- [API](#api)
-- [Contribute](#contribute)
-- [License](#license)
-
-## Security
-
-### Any optional sections
-
-## Background
-
-### Any optional sections
+> ScaleFlow is simple framework based on [Stamp Specification](https://github.com/stampit-org/stamp-specification) and Redux like [data flow](http://redux.js.org/docs/basics/DataFlow.html)
 
 ## Install
 
-This module depends upon a knowledge of [Markdown]().
-
 ```
+$ npm install scaleflow
 ```
-
-### Any optional sections
 
 ## Usage
 
-```
-```
+```js
+const { Core } = require('scaleflow')
 
-### Any optional sections
+const loggerInitializer = (options, { instance }) => {
+  return Object.assign(instance, {
+    log: (...args) => instance.dispatch({
+      type: 'LOG',
+      payload: [`${options.name || 'LOG'}:`].concat(args)
+    })
+  })
+}
+
+const loggerMiddleware = core => next => action => {
+  if (action.type === 'LOG') {
+    console.log(...action.payload)
+  }
+  return next(action)
+}
+
+let MyCore = Core
+  .init(loggerInitializer)
+  .middleware(loggerMiddleware)
+
+let myCore = MyCore({ name: 'MyCore' })
+
+myCore.log('Hello world!') // MyCore: Hello world!
+```
 
 ## API
 
-### Any optional sections
-
-## More optional sections
-
-## Contribute
-
-See [the contribute file](contribute.md)!
-
-PRs accepted.
-
-### Any optional sections
+TODO
 
 ## License
 
