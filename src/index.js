@@ -6,9 +6,9 @@
  * Licensed under MIT.
  */
 
-let Core = require('./core')
-let applyMiddleware = require('./applyMiddleware')
+var applyMiddleware = require('./applyMiddleware')
+var Core = require('./core')
 
-module.exports = {
-  Core, applyMiddleware
-}
+Core.applyMiddleware = applyMiddleware
+
+module.exports = Core['default'] = Core.Core = Core
